@@ -87,11 +87,15 @@ def create_rag_chain(db_name):
 
     embeddings = OpenAIEmbeddings()
 
+   # persist_directoryは引数db_nameをそのまま使う（例: "./.db_all"）
+    persist_dir = db_name
+    os.makedirs(persist_dir, exist_ok=True)
+
     # すでに対象のデータベースが作成済みの場合は読み込み、未作成の場合は新規作成する
-    if os.path.isdir(db_name):
-        db = Chroma(persist_directory=".db", embedding_function=embeddings)
+    if os.path.isdir(persist_dir):
+        db = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
     else:
-        db = Chroma.from_documents(splitted_docs, embedding=embeddings, persist_directory=".db")
+        db = Chroma.from_documents(splitted_docs, embedding=embeddings, persist_directory=persist_dir)
 
     retriever = db.as_retriever(search_kwargs={"k": ct.TOP_K})
 
@@ -197,6 +201,23 @@ def run_customer_doc_chain(param):
 
     return ai_msg["answer"]
 
+def run_all_info_doc_chain(param):
+    """
+    全ての情報に関するデータ参照に特化したTool設定用の関数
+
+    Args:
+        param: ユーザー入力値
+
+    Returns:
+        LLMからの回答
+    """
+    # 全ての情報に関するデータ参照に特化したChainを実行してLLMからの回答取得
+    ai_msg = st.session_state.all_info_doc_chain.invoke({"input": param, "chat_history": st.session_state.chat_history})
+
+    # 会話履歴への追加
+    st.session_state.chat_history.extend([HumanMessage(content=param), AIMessage(content=ai_msg["answer"])])
+
+    return ai_msg["answer"]
 
 def delete_old_conversation_log(result):
     """
@@ -210,14 +231,13 @@ def delete_old_conversation_log(result):
     # 過去の会話履歴の合計トークン数に加算
     st.session_state.total_tokens += response_tokens
 
-    # トークン数が上限値を下回るまで、順に古い会話履歴を削除
-    while st.session_state.total_tokens > ct.MAX_ALLOWED_TOKENS:
-        # 最も古い会話履歴を削除
-        removed_message = st.session_state.chat_history.pop(1)
-        # 最も古い会話履歴のトークン数を取得
-        removed_tokens = len(st.session_state.enc.encode(removed_message.content))
-        # 過去の会話履歴の合計トークン数から、最も古い会話履歴のトークン数を引く
-        st.session_state.total_tokens -= removed_tokens
+    # chat_historyは[HumanMessage, AIMessage, HumanMessage, AIMessage, ...]の順を想定
+    while st.session_state.total_tokens > ct.MAX_ALLOWED_TOKENS and len(st.session_state.chat_history) >= 2:
+        # 最古のHuman/AIペアを削除
+        oldest_human = st.session_state.chat_history.pop(0)
+        oldest_ai = st.session_state.chat_history.pop(0)
+        st.session_state.total_tokens -= len(st.session_state.enc.encode(getattr(oldest_human, "content", "")))
+        st.session_state.total_tokens -= len(st.session_state.enc.encode(getattr(oldest_ai, "content", "")))
 
 
 def execute_agent_or_chain(chat_message):
