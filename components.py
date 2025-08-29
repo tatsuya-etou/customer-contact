@@ -56,8 +56,10 @@ def display_conversation_log(chat_message):
     """
     会話ログの一覧表示
     """
+    logger = logging.getLogger(ct.LOGGER_NAME)
     # 会話ログの最後を表示する時のみ、フィードバック後のメッセージ表示するために「何番目のメッセージか」を取得
     for index, message in enumerate(st.session_state.messages):
+        logger.info(f"index={index}, role={message['role']}, content={message['content']}")
         if message["role"] == "assistant":
             with st.chat_message(message["role"], avatar=ct.AI_ICON_FILE_PATH):
                 st.markdown(message["content"])
@@ -66,8 +68,6 @@ def display_conversation_log(chat_message):
         else:
             with st.chat_message(message["role"], avatar=ct.USER_ICON_FILE_PATH):
                 st.markdown(message["content"])
-                # フィードバックエリアの表示
-                display_after_feedback_message(index, chat_message)
 
 
 def display_after_feedback_message(index, chat_message):
