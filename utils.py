@@ -89,13 +89,12 @@ def create_rag_chain(db_name):
 
    # persist_directoryは引数db_nameをそのまま使う（例: "./.db_all"）
     persist_dir = db_name
-    os.makedirs(persist_dir, exist_ok=True)
 
     # すでに対象のデータベースが作成済みの場合は読み込み、未作成の場合は新規作成する
-    if os.path.isdir(persist_dir):
-        db = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
+    if os.path.isdir(db_name):
+        db = Chroma(persist_directory=db_name, embedding_function=embeddings)
     else:
-        db = Chroma.from_documents(splitted_docs, embedding=embeddings, persist_directory=persist_dir)
+        db = Chroma.from_documents(splitted_docs, embedding=embeddings, persist_directory=db_name)
 
     retriever = db.as_retriever(search_kwargs={"k": ct.TOP_K})
 
